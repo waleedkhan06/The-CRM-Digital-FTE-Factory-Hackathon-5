@@ -1,0 +1,41 @@
+# Customer Success FTE — Python Dependencies
+# Phase 2: Specialization
+
+# ─── Core Framework ─────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic[email]==2.10.4
+python-multipart==0.0.20
+
+# ─── Database ───────────────────────────────────────────────────────────
+asyncpg==0.30.0
+# pgvector (uncomment when pgvector extension is installed)
+# pgvector==0.3.6
+
+# ─── Event Streaming ────────────────────────────────────────────────────
+aiokafka==0.12.0
+
+# ─── AI/ML ──────────────────────────────────────────────────────────────
+openai>=1.58.0
+# OpenAI Agents SDK (when available)
+# openai-agents>=0.0.1
+
+# ─── Channel Integrations ───────────────────────────────────────────────
+google-api-python-client==2.155.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1
+google-cloud-pubsub==2.27.0
+twilio==9.4.1
+
+# ─── MCP (Incubation) ───────────────────────────────────────────────────
+mcp>=1.0.0
+
+# ─── Testing ────────────────────────────────────────────────────────────
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1
+locust==2.32.8
+
+# ─── Utilities ──────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+structlog==24.4.0

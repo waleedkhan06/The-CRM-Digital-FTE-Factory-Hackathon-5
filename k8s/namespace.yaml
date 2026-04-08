@@ -1,0 +1,8 @@
+# Customer Success FTE — Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: customer-success-fte
+  labels:
+    app: customer-success-fte
+    environment: production

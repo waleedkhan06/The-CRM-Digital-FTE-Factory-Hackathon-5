@@ -1,0 +1,19 @@
+# Customer Success FTE — Service (ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: customer-success-fte
+  namespace: customer-success-fte
+  labels:
+    app: customer-success-fte
+    component: api
+spec:
+  type: ClusterIP
+  selector:
+    app: customer-success-fte
+    component: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP

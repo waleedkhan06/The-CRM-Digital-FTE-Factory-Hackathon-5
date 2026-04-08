@@ -1,0 +1,78 @@
+# Customer Success FTE — Message Processor Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fte-message-processor
+  namespace: customer-success-fte
+  labels:
+    app: customer-success-fte
+    component: message-processor
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: customer-success-fte
+      component: message-processor
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: customer-success-fte
+        component: message-processor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: fte-service-account
+      containers:
+        - name: message-processor
+          image: your-registry/customer-success-fte:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "production.workers.message_processor"]
+          envFrom:
+            - configMapRef:
+                name: fte-config
+            - secretRef:
+                name: fte-secrets
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import sys; sys.exit(0)"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: gmail-credentials
+              mountPath: /secrets/gmail
+              readOnly: true
+      volumes:
+        - name: gmail-credentials
+          secret:
+            secretName: gmail-credentials
+            optional: true
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 60
