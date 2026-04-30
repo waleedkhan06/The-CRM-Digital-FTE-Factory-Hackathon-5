@@ -1,0 +1,27 @@
+# Core dependencies
+watchdog>=4.0.0
+python-dotenv>=1.0.0
+
+# Gmail API
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.1.0
+google-auth-oauthlib>=1.1.0
+
+# WhatsApp Web automation (optional)
+playwright>=1.40.0
+
+# LinkedIn API
+linkedin-api>=2.0.3
+requests>=2.31.0
+requests-oauthlib>=1.3.1
+
+# MCP Server support
+mcp>=0.1.0
+
+# Scheduling
+schedule>=1.2.0
+apscheduler>=3.10.0
+
+# Utilities
+pyyaml>=6.0.1
+jinja2>=3.1.2

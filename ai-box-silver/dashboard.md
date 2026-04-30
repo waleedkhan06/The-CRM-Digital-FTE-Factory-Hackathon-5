@@ -1,0 +1,176 @@
+# AI Employee Dashboard - Silver Tier
+
+## Overview
+Welcome to your AI Employee Silver Tier Dashboard. This system proactively monitors your personal and business communications (Gmail, WhatsApp, files) and helps you stay organized with automated task processing and human-in-the-loop approvals.
+
+**Tier**: Silver - Functional Assistant  
+**Last Updated**: {{DATETIME}}
+
+---
+
+## Status Summary
+
+| Category | Count | Status |
+|----------|-------|--------|
+| **Inbox** | {{INBOX_COUNT}} | Monitoring |
+| **Needs Action** | {{NEEDS_ACTION_COUNT}} | Active |
+| **Pending Approval** | {{PENDING_APPROVAL_COUNT}} | Awaiting Review |
+| **Active Plans** | {{PLANS_COUNT}} | Processing |
+| **Completed Today** | {{TODAY_DONE_COUNT}} | Done |
+| **Total Completed** | {{TOTAL_DONE_COUNT}} | Archive |
+
+---
+
+## System Components
+
+### Watchers (Perception Layer)
+| Watcher | Status | Last Check | Interval |
+|---------|--------|------------|----------|
+| File System Watcher | {{FILE_WATCHER_STATUS}} | {{FILE_WATCHER_LAST}} | 10s |
+| Gmail Watcher | {{GMAIL_WATCHER_STATUS}} | {{GMAIL_WATCHER_LAST}} | 120s |
+| WhatsApp Watcher | {{WHATSAPP_WATCHER_STATUS}} | {{WHATSAPP_WATCHER_LAST}} | 60s |
+
+### Processing (Reasoning Layer)
+| Component | Status | Mode |
+|-----------|--------|------|
+| Orchestrator | {{ORCHESTRATOR_STATUS}} | Active |
+| Claude Code Integration | {{CLAUDE_STATUS}} | {{CLAUDE_MODE}} |
+| Ralph Wiggum Loop | {{RALPH_STATUS}} | {{RALPH_ITERATION}} |
+
+### Actions (Action Layer)
+| MCP Server | Status | Capabilities |
+|------------|--------|--------------|
+| Email MCP | {{EMAIL_MCP_STATUS}} | Send, Draft |
+| LinkedIn Poster | {{LINKEDIN_STATUS}} | Post, Schedule |
+
+### Scheduling
+| Scheduler | Status | Next Job |
+|-----------|--------|----------|
+| Task Scheduler | {{SCHEDULER_STATUS}} | {{NEXT_SCHEDULED_JOB}} |
+
+---
+
+## Quick Actions
+
+### Pending Approvals
+<!-- List items that need human approval -->
+{{PENDING_APPROVALS_LIST}}
+
+### High Priority Tasks
+<!-- List high priority items from needs_action -->
+{{HIGH_PRIORITY_TASKS}}
+
+### Recent Activity
+<!-- Last 5 activities from audit log -->
+{{RECENT_ACTIVITY}}
+
+---
+
+## Scheduled Operations
+
+### Daily Tasks
+- **08:00** - Daily Briefing Generation
+- **18:00** - End of Day Summary
+- **00:00** - Expired Approval Cleanup
+
+### Weekly Tasks
+- **Monday 07:00** - Weekly Business Audit
+- **Wednesday 09:00** - LinkedIn Business Post
+- **Friday 16:00** - Friday Status Report
+
+---
+
+## Folder Structure
+
+```
+silver-tier-ai-employee/
+├── inbox/              # Drop zone for new files
+├── needs_action/       # Items requiring processing
+├── plans/              # Active processing plans
+├── pending_approval/   # Awaiting human approval ← REVIEW HERE
+├── approved/           # Approved, ready to execute
+├── rejected/           # Rejected items
+├── done/               # Completed items archive
+├── logs/               # System and audit logs
+├── skills/             # Agent skills/modules
+├── watchers/           # Perception scripts
+├── mcp_servers/        # Action servers
+└── dashboard.md        # This file
+```
+
+---
+
+## Health Check
+
+| Component | Health | Details |
+|-----------|--------|---------|
+| File System | {{FS_HEALTH}} | {{FS_DETAILS}} |
+| Gmail API | {{GMAIL_HEALTH}} | {{GMAIL_DETAILS}} |
+| WhatsApp | {{WHATSAPP_HEALTH}} | {{WHATSAPP_DETAILS}} |
+| Audit Logger | {{AUDIT_HEALTH}} | {{AUDIT_DETAILS}} |
+| Log Storage | {{LOG_HEALTH}} | {{LOG_DETAILS}} |
+
+---
+
+## Configuration Status
+
+| Setting | Value | Status |
+|---------|-------|--------|
+| Demo Mode | {{DEMO_MODE}} | {{DEMO_STATUS}} |
+| Audit Retention | {{RETENTION_DAYS}} days | {{RETENTION_STATUS}} |
+| Max Ralph Iterations | {{MAX_ITERATIONS}} | {{ITERATION_STATUS}} |
+
+---
+
+## Help & Support
+
+### Common Tasks
+
+**To approve an action:**
+1. Navigate to `/pending_approval` folder
+2. Review the approval request file
+3. Move the file to `/approved` folder to approve
+4. Move to `/rejected` folder to reject
+
+**To add a new task:**
+1. Place a file in `/inbox` folder
+2. Or create a markdown file directly in `/needs_action`
+
+**To check system status:**
+1. Review this dashboard
+2. Check `/logs` folder for detailed logs
+3. Run `python main.py --status` for health check
+
+### Documentation
+- [Company Handbook](./company_handbook.md)
+- [Audit Logs](./logs/audit/)
+- [System Logs](./logs/)
+
+---
+
+## Silver Tier Features
+
+✅ **Implemented:**
+- [x] File System Watcher
+- [x] Gmail Watcher (Demo mode available)
+- [x] WhatsApp Watcher (Demo mode available)
+- [x] Claude Reasoning Loop with Plan.md creation
+- [x] Email MCP Server
+- [x] LinkedIn Poster Skill
+- [x] Human-in-the-Loop Approval Workflow
+- [x] Task Scheduler (Daily/Weekly)
+- [x] Ralph Wiggum Persistence Loop
+- [x] Comprehensive Audit Logging
+
+🔜 **Gold Tier Upgrades:**
+- [ ] Odoo Accounting Integration
+- [ ] Facebook/Instagram Integration
+- [ ] Twitter (X) Integration
+- [ ] Multiple MCP Servers
+- [ ] Weekly CEO Briefing with Revenue Tracking
+- [ ] Error Recovery & Graceful Degradation
+
+---
+
+*Generated by AI Employee Silver Tier v0.2*  
+*For support, refer to the hackathon documentation*
