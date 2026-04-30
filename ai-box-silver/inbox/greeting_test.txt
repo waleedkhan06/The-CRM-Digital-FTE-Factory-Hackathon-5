@@ -1,1 +1,0 @@
-Hello, this is a greeting test file for the AI Employee system.
