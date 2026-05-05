@@ -72,10 +72,12 @@ app.include_router(web_form_router)
 
 from production.channels.gmail_handler import GmailHandler
 from production.channels.whatsapp_handler import WhatsAppHandler
+from production.channels.meta_whatsapp_handler import MetaWhatsAppHandler
 from production.kafka_client import FTEKafkaProducer, TOPICS
 
 gmail_handler = GmailHandler()
 whatsapp_handler = WhatsAppHandler()
+meta_wa_handler = MetaWhatsAppHandler()
 kafka_producer = FTEKafkaProducer()
 
 # ─── Lifecycle Events ──────────────────────────────────────────────────────
@@ -400,6 +402,60 @@ async def get_channel_metrics():
         logger.error(f"Metrics retrieval error: {e}")
         # Return empty metrics rather than error
         return {}
+
+
+# ─── Meta WhatsApp Webhook Endpoints ─────────────────────────────────────
+
+@app.get("/webhooks/meta-whatsapp")
+async def meta_whatsapp_verify(
+    request: Request,
+):
+    """
+    Meta webhook verification challenge.
+    Meta sends GET with hub.mode, hub.verify_token, hub.challenge.
+    """
+    params = dict(request.query_params)
+    mode = params.get("hub.mode", "")
+    token = params.get("hub.verify_token", "")
+    challenge = params.get("hub.challenge", "")
+    return int(challenge) if challenge.isdigit() else meta_wa_handler.verify_webhook(mode, token, challenge)
+
+
+@app.post("/webhooks/meta-whatsapp")
+async def meta_whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
+    """
+    Handle incoming Meta WhatsApp messages.
+    Meta posts JSON payload when a user sends a WhatsApp message.
+    """
+    try:
+        body_bytes = await request.body()
+        sig = request.headers.get("X-Hub-Signature-256", "")
+        if not meta_wa_handler.validate_signature(body_bytes, sig):
+            raise HTTPException(status_code=403, detail="Invalid signature")
+
+        payload = await request.json()
+        messages = meta_wa_handler.parse_incoming(payload)
+
+        for msg in messages:
+            background_tasks.add_task(
+                kafka_producer.publish,
+                TOPICS['tickets_incoming'],
+                msg
+            )
+            # Mark message as read
+            background_tasks.add_task(
+                meta_wa_handler.mark_read,
+                msg['channel_message_id']
+            )
+
+        logger.info(f"Meta WhatsApp: queued {len(messages)} messages")
+        return {"status": "ok"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Meta WhatsApp webhook error: {e}")
+        return {"status": "ok"}  # always 200 to Meta
 
 
 # ─── Gmail Poll Endpoint (Local Testing) ──────────────────────────────────
