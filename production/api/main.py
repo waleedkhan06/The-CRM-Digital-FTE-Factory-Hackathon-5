@@ -41,9 +41,24 @@ app = FastAPI(
 # ─── Middleware ─────────────────────────────────────────────────────────────
 
 # CORS for web form
+# allow_credentials=True is incompatible with allow_origins=["*"].
+# In development we expand the origins list to cover all common frontend ports.
+_cors_origins = webform.allowed_origins
+if "*" in _cors_origins or os.getenv("ENVIRONMENT", "development") == "development":
+    _cors_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:4000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:8080",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=webform.allowed_origins if webform.allowed_origins != ["*"] else ["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -385,6 +400,43 @@ async def get_channel_metrics():
         logger.error(f"Metrics retrieval error: {e}")
         # Return empty metrics rather than error
         return {}
+
+
+# ─── Gmail Poll Endpoint (Local Testing) ──────────────────────────────────
+
+@app.post("/gmail/poll")
+async def poll_gmail(background_tasks: BackgroundTasks, max_results: int = 10):
+    """
+    Poll Gmail inbox for unread emails and process them through the agent.
+
+    Useful for local testing without Pub/Sub setup.
+    Fetches unread messages, marks them as read, and runs each through the agent.
+    """
+    try:
+        messages = await gmail_handler.fetch_unread(max_results=max_results)
+
+        if not messages:
+            return {"status": "ok", "processed": 0, "message": "No unread emails found"}
+
+        results = []
+        for msg in messages:
+            background_tasks.add_task(
+                kafka_producer.publish,
+                TOPICS['tickets_incoming'],
+                msg
+            )
+            results.append({
+                "from": msg.get("customer_email"),
+                "subject": msg.get("subject"),
+                "message_id": msg.get("channel_message_id"),
+            })
+
+        logger.info(f"Gmail poll: queued {len(results)} emails for processing")
+        return {"status": "ok", "processed": len(results), "emails": results}
+
+    except Exception as e:
+        logger.error(f"Gmail poll error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ─── Agent Processing Endpoint (Manual Trigger) ───────────────────────────

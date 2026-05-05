@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class UnifiedMessageProcessor:
     """Process incoming messages from all channels through the FTE agent."""
 
-    def __init__(self):
+    def __init__(self, metrics_collector: "MetricsCollector" = None):
         from production.channels.gmail_handler import GmailHandler
         from production.channels.whatsapp_handler import WhatsAppHandler
 
@@ -39,6 +39,7 @@ class UnifiedMessageProcessor:
         self.whatsapp = WhatsAppHandler()
         self.producer = FTEKafkaProducer()
         self._running = False
+        self._metrics: "MetricsCollector" = metrics_collector
 
     async def start(self):
         """Start the message processor."""
@@ -155,6 +156,17 @@ class UnifiedMessageProcessor:
                 'tool_calls_count': len(result.tool_calls) if hasattr(result, 'tool_calls') else 0,
             })
 
+            # Record real-time metrics
+            if self._metrics:
+                self._metrics.record_message(
+                    channel=channel,
+                    latency_ms=latency_ms,
+                    escalated=result.escalated if hasattr(result, 'escalated') else False,
+                    sentiment_score=result.sentiment_score if hasattr(result, 'sentiment_score') else 0.5,
+                )
+                if hasattr(result, 'escalation_reason') and result.escalation_reason:
+                    self._metrics.record_escalation(result.escalation_reason)
+
             logger.info(
                 f"Processed {channel} message in {latency_ms}ms | "
                 f"escalated={result.escalated if hasattr(result, 'escalated') else False} | "
@@ -163,6 +175,13 @@ class UnifiedMessageProcessor:
 
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
+            if self._metrics:
+                channel = message.get('channel', 'web_form')
+                self._metrics.record_message(
+                    channel=channel, latency_ms=0,
+                    escalated=False, sentiment_score=0.5, error=True
+                )
+                self._metrics.record_dlq_event()
             await self.handle_error(message, e)
 
     async def resolve_customer(self, message: dict) -> str:
@@ -368,47 +387,15 @@ class UnifiedMessageProcessor:
 
 # ─── Metrics Collector Worker ──────────────────────────────────────────────
 
-class MetricsCollector:
-    """Background worker that collects and records metrics."""
-
-    def __init__(self):
-        self._running = False
-
-    async def start(self):
-        """Start the metrics collector."""
-        self._running = True
-        logger.info("Metrics collector started")
-
-        while self._running:
-            try:
-                await self.collect_metrics()
-            except Exception as e:
-                logger.error(f"Error collecting metrics: {e}")
-
-            await asyncio.sleep(60)  # Collect every minute
-
-    async def stop(self):
-        """Stop the metrics collector."""
-        self._running = False
-        logger.info("Metrics collector stopped")
-
-    async def collect_metrics(self):
-        """Collect and record system metrics."""
-        from production.database.queries import record_metric
-
-        # Record queue depth
-        # Record processing latency
-        # Record error rates
-        # Record sentiment distribution
-        pass  # Implementation depends on monitoring infrastructure
+from production.workers.metrics_collector import MetricsCollector  # noqa: E402
 
 
 # ─── Main Entry Point ──────────────────────────────────────────────────────
 
 async def main():
     """Start all workers."""
-    processor = UnifiedMessageProcessor()
     metrics = MetricsCollector()
+    processor = UnifiedMessageProcessor(metrics_collector=metrics)
 
     # Run both concurrently
     await asyncio.gather(

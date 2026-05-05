@@ -55,7 +55,7 @@ const PRIORITIES = [
   { value: "high", label: "High", desc: "Urgent issue", color: "text-red-400 bg-red-500/10 border-red-500/20" },
 ];
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 // ─── Main Component ────────────────────────────────────────────────────────
 

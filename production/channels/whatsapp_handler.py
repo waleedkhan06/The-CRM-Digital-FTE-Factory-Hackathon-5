@@ -204,6 +204,9 @@ class WhatsAppHandler:
                 break_point = max_length
 
             chunk = remaining[:break_point + 1].strip()
+            if len(chunk) > max_length:
+                chunk = remaining[:max_length].strip()
+                break_point = max_length - 1
             messages.append(chunk)
             remaining = remaining[break_point + 1:].strip()
 
@@ -235,6 +238,41 @@ class WhatsAppHandler:
                 await asyncio.sleep(1)
 
         return results
+
+    def parse_webhook_data(self, form_data: dict) -> dict:
+        """Parse Twilio webhook form data into a normalised message dict.
+
+        Synchronous alias for use in tests and direct parsing without
+        the full async process_webhook flow.
+
+        Args:
+            form_data: Form fields from Twilio POST (dict)
+
+        Returns:
+            Normalised message dict with channel, customer_phone, content, etc.
+        """
+        from_raw = form_data.get('From', '')
+        phone = from_raw.replace('whatsapp:', '').strip()
+        return {
+            'channel': 'whatsapp',
+            'channel_message_id': form_data.get('MessageSid', ''),
+            'customer_phone': phone,
+            'customer_name': form_data.get('ProfileName', ''),
+            'content': form_data.get('Body', '').strip(),
+            'received_at': datetime.utcnow().isoformat(),
+            'metadata': {
+                'num_media': int(form_data.get('NumMedia', '0')),
+                'wa_id': form_data.get('WaId', ''),
+                'account_sid': form_data.get('AccountSid', ''),
+            }
+        }
+
+    def split_message(self, message: str, max_length: int = 1600) -> list:
+        """Split a message into WhatsApp-sized chunks.
+
+        Alias for format_response to match test naming convention.
+        """
+        return self.format_response(message, max_length)
 
     async def update_delivery_status(self, message_sid: str,
                                       status: str) -> dict:

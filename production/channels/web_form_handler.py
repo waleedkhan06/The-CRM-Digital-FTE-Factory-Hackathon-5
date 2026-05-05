@@ -17,6 +17,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel, EmailStr, field_validator
+from production.kafka_client import FTEKafkaProducer, TOPICS
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,9 @@ class SupportFormSubmission(BaseModel):
         return v or 'medium'
 
 
+SupportFormRequest = SupportFormSubmission  # alias used by tests
+
+
 class SupportFormResponse(BaseModel):
     """Response model for form submission."""
     ticket_id: str
@@ -116,7 +120,6 @@ async def submit_support_form(
             create_ticket,
             store_message
         )
-        from production.kafka_client import FTEKafkaProducer, TOPICS
 
         # 1. Get or create customer
         customer = await get_or_create_customer(
@@ -171,9 +174,9 @@ async def submit_support_form(
             'priority': submission.priority,
             'received_at': datetime.utcnow().isoformat(),
             'metadata': {
-                'ticket_id': ticket['id'],
-                'conversation_id': conversation['id'],
-                'customer_id': customer['id'],
+                'ticket_id': str(ticket['id']),
+                'conversation_id': str(conversation['id']),
+                'customer_id': str(customer['id']),
                 'form_version': '1.0',
                 'attachments': submission.attachments
             }
@@ -234,20 +237,39 @@ async def get_ticket_status(ticket_id: str):
             get_conversation_messages
         )
 
-        # Find ticket by channel_message_id
-        ticket = await get_ticket(ticket_id)
+        from production.database.queries import get_pool
+        pool = await get_pool()
 
-        if not ticket:
-            # Try searching by conversation metadata
-            from production.database.queries import get_pool
-            pool = await get_pool()
-            async with pool.acquire() as conn:
+        ticket = None
+        async with pool.acquire() as conn:
+            # 1. Direct lookup by tickets.id
+            row = await conn.fetchrow(
+                "SELECT * FROM tickets WHERE id = $1",
+                ticket_id
+            )
+            if row:
+                ticket = dict(row)
+
+            # 2. Lookup via messages.channel_message_id (what we return to the user)
+            if not ticket:
                 row = await conn.fetchrow("""
-                    SELECT t.*, c.metadata as conv_metadata
+                    SELECT t.*
+                    FROM tickets t
+                    JOIN messages m ON m.conversation_id = t.conversation_id
+                    WHERE m.channel_message_id = $1
+                    LIMIT 1
+                """, ticket_id)
+                if row:
+                    ticket = dict(row)
+
+            # 3. Lookup via conversation metadata ticket_id
+            if not ticket:
+                row = await conn.fetchrow("""
+                    SELECT t.*
                     FROM tickets t
                     JOIN conversations c ON c.id = t.conversation_id
-                    WHERE c.metadata->>'form_submission_id' = $1
-                       OR c.metadata->>'subject' = $1
+                    WHERE c.metadata->>'ticket_id' = $1
+                    LIMIT 1
                 """, ticket_id)
                 if row:
                     ticket = dict(row)

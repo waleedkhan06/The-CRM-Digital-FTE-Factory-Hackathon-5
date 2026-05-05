@@ -77,7 +77,10 @@ def format_for_channel(response_text: str, channel: str,
     Returns:
         Formatted response string
     """
-    channel_enum = Channel(channel) if isinstance(channel, str) else channel
+    try:
+        channel_enum = Channel(channel) if isinstance(channel, str) else channel
+    except ValueError:
+        channel_enum = Channel.WEB_FORM
     config = CHANNEL_CONFIGS.get(channel_enum, CHANNEL_CONFIGS[Channel.WEB_FORM])
 
     # Build greeting
@@ -146,7 +149,10 @@ def _remove_emojis(text: str) -> str:
 
 def truncate_for_channel(response_text: str, channel: str) -> str:
     """Truncate response to fit channel limits without cutting mid-sentence."""
-    channel_enum = Channel(channel) if isinstance(channel, str) else channel
+    try:
+        channel_enum = Channel(channel) if isinstance(channel, str) else channel
+    except ValueError:
+        channel_enum = Channel.WEB_FORM
     config = CHANNEL_CONFIGS.get(channel_enum, CHANNEL_CONFIGS[Channel.WEB_FORM])
     max_length = config.get('preferred_length', config['max_length'])
 

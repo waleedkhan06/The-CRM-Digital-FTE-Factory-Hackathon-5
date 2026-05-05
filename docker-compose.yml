@@ -10,16 +10,16 @@ services:
     image: pgvector/pgvector:pg16
     container_name: fte-postgres
     environment:
-      POSTGRES_DB: fte_db
-      POSTGRES_USER: fte_user
-      POSTGRES_PASSWORD: fte_password
+      POSTGRES_DB: ${POSTGRES_DB:-fte_db}
+      POSTGRES_USER: ${POSTGRES_USER:-fte_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fte_password}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./production/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fte_user -d fte_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fte_user} -d ${POSTGRES_DB:-fte_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,16 +66,17 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: fte_db
-      POSTGRES_USER: fte_user
-      POSTGRES_PASSWORD: fte_password
+      POSTGRES_DB: ${POSTGRES_DB:-fte_db}
+      POSTGRES_USER: ${POSTGRES_USER:-fte_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fte_password}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder}
-      ENVIRONMENT: development
-      LOG_LEVEL: DEBUG
-      GMAIL_ENABLED: "false"
-      WHATSAPP_ENABLED: "false"
-      WEBFORM_ENABLED: "true"
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      GMAIL_ENABLED: ${GMAIL_ENABLED:-false}
+      GMAIL_CREDENTIALS_PATH: /app/credentials/gmail_oauth.json
+      WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      WEBFORM_ENABLED: ${WEBFORM_ENABLED:-true}
     volumes:
       - ./production:/app/production
       - ./incubation:/app/incubation
@@ -98,13 +99,13 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: fte_db
-      POSTGRES_USER: fte_user
-      POSTGRES_PASSWORD: fte_password
+      POSTGRES_DB: ${POSTGRES_DB:-fte_db}
+      POSTGRES_USER: ${POSTGRES_USER:-fte_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fte_password}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       OPENAI_API_KEY: ${OPENAI_API_KEY:-sk-placeholder}
-      ENVIRONMENT: development
-      LOG_LEVEL: DEBUG
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
     volumes:
       - ./production:/app/production
       - ./incubation:/app/incubation

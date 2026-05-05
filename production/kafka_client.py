@@ -85,10 +85,9 @@ class FTEKafkaProducer:
                 key_serializer=lambda k: k.encode('utf-8') if k else None,
                 # Reliability settings
                 acks='all',
-                retries=3,
                 # Batching
                 linger_ms=10,
-                batch_size=16384,
+                max_batch_size=16384,
             )
             await self.producer.start()
             self._running = True

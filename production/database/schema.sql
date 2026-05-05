@@ -293,7 +293,7 @@ RETURNS TRIGGER AS $$
 BEGIN
     UPDATE customers 
     SET avg_sentiment = (
-        SELECT COALESCE(AVG(sentiment_score), 0.50)
+        SELECT COALESCE(AVG(m.sentiment_score), 0.50)
         FROM messages m
         JOIN conversations c ON m.conversation_id = c.id
         WHERE c.customer_id = NEW.customer_id
@@ -338,15 +338,15 @@ EXECUTE FUNCTION set_ticket_resolved_at();
 -- Daily ticket summary view
 CREATE VIEW daily_ticket_summary AS
 SELECT 
-    DATE(created_at) as date,
-    source_channel,
-    status,
+    DATE(t.created_at) as date,
+    t.source_channel,
+    t.status,
     COUNT(*) as ticket_count,
-    COUNT(*) FILTER (WHERE status = 'escalated') as escalated_count,
-    COUNT(*) FILTER (WHERE status = 'resolved') as resolved_count,
-    AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))/60) FILTER (WHERE resolved_at IS NOT NULL) as avg_resolution_minutes
-FROM tickets
-GROUP BY DATE(created_at), source_channel, status;
+    COUNT(*) FILTER (WHERE t.status = 'escalated') as escalated_count,
+    COUNT(*) FILTER (WHERE t.status = 'resolved') as resolved_count,
+    AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at))/60) FILTER (WHERE t.resolved_at IS NOT NULL) as avg_resolution_minutes
+FROM tickets t
+GROUP BY DATE(t.created_at), t.source_channel, t.status;
 
 -- Customer satisfaction view
 CREATE VIEW customer_satisfaction AS
@@ -367,12 +367,12 @@ GROUP BY c.id, c.name, c.email, c.avg_sentiment, c.total_interactions;
 -- Channel performance view
 CREATE VIEW channel_performance AS
 SELECT 
-    source_channel,
+    t.source_channel,
     COUNT(*) as total_tickets,
-    COUNT(*) FILTER (WHERE status = 'escalated') as escalated,
-    COUNT(*) FILTER (WHERE status = 'resolved') as resolved,
-    ROUND(AVG(sentiment_score)::numeric, 2) as avg_sentiment,
+    COUNT(*) FILTER (WHERE t.status = 'escalated') as escalated,
+    COUNT(*) FILTER (WHERE t.status = 'resolved') as resolved,
+    ROUND(AVG(t.sentiment_score)::numeric, 2) as avg_sentiment,
     ROUND(AVG(EXTRACT(EPOCH FROM (t.resolved_at - t.created_at))/60)::numeric, 1) as avg_resolution_min
 FROM tickets t
 JOIN conversations c ON c.id = t.conversation_id
-GROUP BY source_channel;
+GROUP BY t.source_channel;

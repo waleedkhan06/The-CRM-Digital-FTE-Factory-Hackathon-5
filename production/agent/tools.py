@@ -410,7 +410,12 @@ async def analyze_sentiment(message: str) -> str:
 
 def _calculate_sentiment(text: str) -> float:
     """Calculate sentiment score (0.0 to 1.0)."""
-    text = text.lower()
+    import re
+
+    # Count all-caps words before lowercasing (indicates shouting / anger)
+    caps_words = len(re.findall(r'\b[A-Z]{2,}\b', text))
+
+    text_lower = text.lower()
 
     positive_words = {
         'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic',
@@ -420,20 +425,24 @@ def _calculate_sentiment(text: str) -> float:
     negative_words = {
         'bad', 'terrible', 'awful', 'horrible', 'worst', 'hate',
         'angry', 'frustrated', 'frustrating', 'annoyed', 'disappointed',
-        'useless', 'garbage', 'broken', 'not working', 'sucks',
+        'useless', 'garbage', 'broken', 'sucks',
         'ridiculous', 'unacceptable', 'scam', 'waste', 'pathetic'
     }
 
-    words = set(text.split())
+    # Strip punctuation from each token so 'ridiculous!' matches 'ridiculous'
+    words = {re.sub(r'[^a-z0-9]', '', w) for w in text_lower.split()}
     positive_count = len(words & positive_words)
     negative_count = len(words & negative_words)
+
+    # Each all-caps word adds 0.5 to the effective negative count (shouting)
+    negative_count += caps_words * 0.5
 
     total = positive_count + negative_count
     if total == 0:
         return 0.5
 
     raw_score = (positive_count - negative_count) / total
-    return round((raw_score + 1) / 2, 2)
+    return round(max(0.0, min(1.0, (raw_score + 1) / 2)), 2)
 
 
 # ─── Escalation Evaluation ────────────────────────────────────────────────

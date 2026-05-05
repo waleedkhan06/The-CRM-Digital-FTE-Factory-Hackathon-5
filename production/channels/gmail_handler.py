@@ -40,23 +40,58 @@ class GmailHandler:
             self._initialized = False
 
     def _initialize_service(self):
-        """Initialize Gmail API service."""
-        from google.oauth2.credentials import Credentials
-        from google.oauth2.service_account import Credentials as ServiceCredentials
+        """Initialize Gmail API service.
+
+        Supports two credential types (auto-detected):
+        1. OAuth2 client secret JSON  — produced by Google Cloud Console
+           (the client_secret_*.json file in the project root)
+        2. Service account JSON       — for server-to-server auth
+
+        For OAuth2 client secrets a pre-authorised token file is expected at
+        GMAIL_TOKEN_PATH (default: credentials/gmail_token.json).  If the
+        token file does not exist the handler starts in mock mode so the
+        rest of the system is not blocked.
+        """
         from googleapiclient.discovery import build
 
+        # ── Option 1: try OAuth2 token (from client secret flow) ──────────
+        token_path = os.getenv("GMAIL_TOKEN_PATH", "credentials/gmail_token.json")
+        if os.path.exists(token_path):
+            from google.oauth2.credentials import Credentials
+            from google.auth.transport.requests import Request
+
+            creds = Credentials.from_authorized_user_file(
+                token_path,
+                scopes=['https://www.googleapis.com/auth/gmail.modify']
+            )
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                # persist refreshed token
+                with open(token_path, "w") as f:
+                    f.write(creds.to_json())
+
+            self.service = build('gmail', 'v1', credentials=creds)
+            self._initialized = True
+            logger.info("Gmail API initialized via OAuth2 token")
+            return
+
+        # ── Option 2: try service account JSON ────────────────────────────
         if os.path.exists(self.credentials_path):
-            # Use service account credentials
-            credentials = ServiceCredentials.from_service_account_file(
+            from google.oauth2.service_account import Credentials as SACredentials
+            creds = SACredentials.from_service_account_file(
                 self.credentials_path,
                 scopes=['https://www.googleapis.com/auth/gmail.modify']
             )
-            self.service = build('gmail', 'v1', credentials=credentials)
+            self.service = build('gmail', 'v1', credentials=creds)
             self._initialized = True
-            logger.info("Gmail API initialized successfully")
-        else:
-            logger.warning(f"Gmail credentials not found at {self.credentials_path}")
-            self._initialized = False
+            logger.info("Gmail API initialized via service account")
+            return
+
+        logger.warning(
+            f"No Gmail credentials found at '{token_path}' or '{self.credentials_path}'. "
+            "Running in mock mode."
+        )
+        self._initialized = False
 
     async def setup_push_notifications(self, topic_name: str) -> dict:
         """Set up Gmail push notifications via Pub/Sub.
@@ -129,6 +164,37 @@ class GmailHandler:
         except Exception as e:
             logger.error(f"Error processing Gmail notification: {e}")
             return []
+
+    async def fetch_unread(self, max_results: int = 10) -> list[dict]:
+        """Fetch unread emails from Gmail inbox.
+
+        Returns list of normalised message dicts, newest first.
+        Marks each fetched message as read.
+        """
+        if not self._initialized:
+            logger.warning("Gmail not initialised — returning mock message")
+            return [self._mock_email_message()]
+
+        results = self.service.users().messages().list(
+            userId='me',
+            q='is:unread in:inbox',
+            maxResults=max_results
+        ).execute()
+
+        messages = results.get('messages', [])
+        parsed = []
+        for m in messages:
+            try:
+                parsed.append(await self.get_message(m['id']))
+                # Mark as read
+                self.service.users().messages().modify(
+                    userId='me',
+                    id=m['id'],
+                    body={'removeLabelIds': ['UNREAD']}
+                ).execute()
+            except Exception as e:
+                logger.error(f"Error fetching message {m['id']}: {e}")
+        return parsed
 
     async def get_message(self, message_id: str) -> dict:
         """Fetch and parse a Gmail message.
@@ -280,6 +346,87 @@ class GmailHandler:
                 'delivery_status': 'failed',
                 'error': str(e)
             }
+
+    def parse_pubsub_payload(self, payload: dict) -> dict:
+        """Decode and parse a Google Cloud Pub/Sub push payload.
+
+        Args:
+            payload: Raw Pub/Sub push body with 'message.data' (base64)
+
+        Returns:
+            Decoded dict (emailAddress, historyId, etc.)
+        """
+        try:
+            message = payload.get("message", {})
+            data_b64 = message.get("data", "")
+            # Add padding if needed
+            padding = 4 - len(data_b64) % 4
+            if padding != 4:
+                data_b64 += "=" * padding
+            decoded = base64.b64decode(data_b64).decode("utf-8")
+            import json
+            return json.loads(decoded)
+        except Exception as e:
+            logger.warning(f"Failed to parse Pub/Sub payload: {e}")
+            return {}
+
+    def parse_email_message(self, gmail_message: dict) -> dict:
+        """Parse a raw Gmail API message object into a normalised dict.
+
+        Args:
+            gmail_message: Full message dict from Gmail API (format='full')
+
+        Returns:
+            Normalised message dict with from_email, subject, body, etc.
+        """
+        payload = gmail_message.get("payload", {})
+        headers = {
+            h["name"]: h["value"]
+            for h in payload.get("headers", [])
+        }
+
+        body = self._extract_body(payload)
+        from_header = headers.get("From", "")
+
+        return {
+            "id": gmail_message.get("id", ""),
+            "thread_id": gmail_message.get("threadId", ""),
+            "from_email": self._extract_email(from_header),
+            "from_name": self._extract_name(from_header),
+            "subject": headers.get("Subject", ""),
+            "body": body,
+            "date": headers.get("Date", ""),
+            "message_id": headers.get("Message-ID", ""),
+            "in_reply_to": headers.get("In-Reply-To", ""),
+        }
+
+    def build_reply_message(self, to_email: str, subject: str, body: str,
+                             thread_id: str = None,
+                             in_reply_to: str = None) -> dict:
+        """Build a base64-encoded MIME reply message ready for Gmail API send.
+
+        Args:
+            to_email: Recipient email
+            subject: Subject line
+            body: Plain-text body
+            thread_id: Optional Gmail thread ID for threading
+            in_reply_to: Optional Message-ID of the message being replied to
+
+        Returns:
+            Dict with 'raw' (base64url-encoded MIME) and optional 'threadId'
+        """
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["To"] = to_email
+        msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
+        if in_reply_to:
+            msg["In-Reply-To"] = in_reply_to
+            msg["References"] = in_reply_to
+
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+        result = {"raw": raw}
+        if thread_id:
+            result["threadId"] = thread_id
+        return result
 
     def _mock_email_message(self) -> dict:
         """Return a mock email for testing when Gmail API is unavailable."""
