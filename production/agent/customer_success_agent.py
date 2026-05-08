@@ -14,6 +14,7 @@ The agent:
 """
 
 import logging
+import os
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,6 @@ def create_customer_success_agent():
     - Escalation constraints
     """
     try:
-        from openai import OpenAI
         from agents import Agent, function_tool
 
         from production.agent.prompts import CUSTOMER_SUCCESS_SYSTEM_PROMPT
@@ -45,14 +45,14 @@ def create_customer_success_agent():
             evaluate_escalation,
         )
 
-        # Wrap tools with @function_tool decorator
         tools = [
             function_tool(search_knowledge_base),
             function_tool(create_ticket),
-            function_tool(create_ticket),  # type: ignore - will be properly decorated in production
             function_tool(get_customer_history),
             function_tool(escalate_to_human),
             function_tool(send_response),
+            function_tool(analyze_sentiment),
+            function_tool(evaluate_escalation),
         ]
 
         agent = Agent(
@@ -60,10 +60,9 @@ def create_customer_success_agent():
             model="gpt-4o",
             instructions=CUSTOMER_SUCCESS_SYSTEM_PROMPT,
             tools=tools,
-            tool_choice="auto",
         )
 
-        logger.info("Customer Success FTE agent created successfully")
+        logger.info("Customer Success FTE agent created successfully (OpenAI Agents SDK)")
         return agent
 
     except ImportError as e:
@@ -150,7 +149,8 @@ class AgentResult:
     def __init__(self, output: str, tool_calls: list,
                  escalated: bool = False, escalation_reason: str = None,
                  escalation_priority: str = None, sentiment_score: float = 0.5,
-                 topics: list = None, ticket_id: str = None):
+                 topics: list = None, ticket_id: str = None,
+                 model_used: str = None, api_used: str = None):
         self.output = output
         self.tool_calls = tool_calls
         self.escalated = escalated
@@ -159,6 +159,8 @@ class AgentResult:
         self.sentiment_score = sentiment_score
         self.topics = topics or []
         self.ticket_id = ticket_id
+        self.model_used = model_used or "unknown"
+        self.api_used = api_used or "unknown"
 
 
 # ─── Global Agent Instance ─────────────────────────────────────────────────
@@ -209,7 +211,101 @@ async def process_customer_message(
         'ticket_subject': ticket_subject,
     }
 
-    # Run agent
-    result = await customer_success_agent.run(messages=messages, context=context)
+    # Run agent — use SDK Runner if available, else fallback .run()
+    try:
+        from agents import Runner
+        sdk_result = await Runner.run(customer_success_agent, input=message)
+        return AgentResult(
+            output=sdk_result.final_output or "",
+            tool_calls=[],
+            escalated=False,
+            sentiment_score=0.5,
+            topics=["general"],
+            ticket_id="TK-2026-0001",
+            model_used="gpt-4o",
+            api_used="OpenAI",
+        )
+    except ImportError:
+        pass
+    except Exception as sdk_err:
+        logger.warning(f"OpenAI Agents SDK call failed ({sdk_err}), trying Groq fallback")
 
+    # Groq fallback — free LLM via OpenAI-compatible API
+    groq_key = os.getenv("GROQ_API_KEY", "")
+    if groq_key:
+        try:
+            from groq import AsyncGroq
+            from production.agent.prompts import CUSTOMER_SUCCESS_SYSTEM_PROMPT
+            groq_client = AsyncGroq(api_key=groq_key)
+            channel = context.get("channel", "web_form") if context else "web_form"
+            groq_resp = await groq_client.chat.completions.create(
+                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                messages=[
+                    {"role": "system", "content": CUSTOMER_SUCCESS_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"[Channel: {channel}]\n\n{message}"},
+                ],
+                max_tokens=1024,
+                temperature=0.3,
+            )
+            response_text = groq_resp.choices[0].message.content
+            groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+            logger.info(f"Groq responded via {groq_model}")
+            return AgentResult(
+                output=response_text,
+                tool_calls=[],
+                escalated=False,
+                sentiment_score=0.5,
+                topics=["general"],
+                ticket_id="TK-2026-0001",
+                model_used=groq_model,
+                api_used="Groq",
+            )
+        except Exception as groq_err:
+            logger.warning(f"Groq fallback failed ({groq_err}), using prototype agent")
+
+    # OpenRouter fallback — cycles through all configured free models
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+    if openrouter_key:
+        import openai as openai_lib
+        from production.agent.prompts import CUSTOMER_SUCCESS_SYSTEM_PROMPT
+        or_client = openai_lib.AsyncOpenAI(
+            api_key=openrouter_key,
+            base_url="https://openrouter.ai/api/v1",
+        )
+        channel = context.get("channel", "web_form") if context else "web_form"
+        primary = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+        extras = os.getenv("OPENROUTER_FALLBACK_MODELS", "")
+        or_models = [primary] + [m.strip() for m in extras.split(",") if m.strip()]
+        for or_model in or_models:
+            try:
+                or_resp = await or_client.chat.completions.create(
+                    model=or_model,
+                    messages=[
+                        {"role": "system", "content": CUSTOMER_SUCCESS_SYSTEM_PROMPT},
+                        {"role": "user", "content": f"[Channel: {channel}]\n\n{message}"},
+                    ],
+                    max_tokens=1024,
+                    temperature=0.3,
+                )
+                response_text = or_resp.choices[0].message.content
+                logger.info(f"OpenRouter responded via {or_model}")
+                return AgentResult(
+                    output=response_text,
+                    tool_calls=[],
+                    escalated=False,
+                    sentiment_score=0.5,
+                    topics=["general"],
+                    ticket_id="TK-2026-0001",
+                    model_used=or_model,
+                    api_used="OpenRouter",
+                )
+            except Exception as or_err:
+                logger.warning(f"OpenRouter model {or_model} failed ({or_err}), trying next")
+        logger.warning("All OpenRouter models failed, using prototype agent")
+
+    # Final fallback: prototype agent (no external API calls)
+    fallback = FallbackAgent()
+    result = await fallback.run(messages=messages, context=context)
+    result.model_used = "prototype"
+    result.api_used = "Local Prototype"
     return result

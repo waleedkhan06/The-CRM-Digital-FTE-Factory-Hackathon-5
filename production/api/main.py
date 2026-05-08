@@ -524,6 +524,8 @@ async def trigger_agent_processing(message: dict):
             'sentiment': result.sentiment_score,
             'topics': result.topics,
             'ticket_id': result.ticket_id,
+            'api_used': getattr(result, 'api_used', 'unknown'),
+            'model_used': getattr(result, 'model_used', 'unknown'),
         }
 
     except Exception as e:
