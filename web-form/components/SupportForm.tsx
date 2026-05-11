@@ -37,6 +37,9 @@ interface SubmitResponse {
   ticket_id: string;
   message: string;
   estimated_response_time: string;
+  ai_response?: string;
+  escalated?: boolean;
+  escalation_reason?: string;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────
@@ -73,6 +76,8 @@ export default function SupportForm() {
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [responseMessage, setResponseMessage] = useState("");
   const [estimatedTime, setEstimatedTime] = useState("");
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [escalated, setEscalated] = useState(false);
   const [activeField, setActiveField] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -139,6 +144,8 @@ export default function SupportForm() {
         setTicketId(data.ticket_id);
         setResponseMessage(data.message);
         setEstimatedTime(data.estimated_response_time);
+        setAiResponse(data.ai_response || null);
+        setEscalated(data.escalated || false);
         setStatus("success");
       } catch (err) {
         setErrors({ form: err instanceof Error ? err.message : "An unexpected error occurred" });
@@ -170,6 +177,8 @@ export default function SupportForm() {
     setTicketId(null);
     setResponseMessage("");
     setEstimatedTime("");
+    setAiResponse(null);
+    setEscalated(false);
   }, []);
 
   // ─── Character count ──────────────────────────────────────────────────
@@ -269,15 +278,36 @@ export default function SupportForm() {
               </div>
             </motion.div>
 
+            {/* AI Response */}
+            {aiResponse && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="text-left bg-gradient-to-br from-indigo-950/60 to-cyan-950/40 border border-indigo-500/20 rounded-2xl p-5 mb-6 max-w-lg mx-auto"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <span className="text-xs font-semibold text-indigo-400 uppercase tracking-widest">AI Response</span>
+                  {escalated && (
+                    <span className="ml-auto text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      Escalated to Human
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{aiResponse}</p>
+              </motion.div>
+            )}
+
             {/* ETA */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
+              transition={{ delay: 0.7 }}
               className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-8"
             >
               <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Estimated response: {estimatedTime}</span>
+              <span>{estimatedTime}</span>
             </motion.div>
 
             {/* Actions */}

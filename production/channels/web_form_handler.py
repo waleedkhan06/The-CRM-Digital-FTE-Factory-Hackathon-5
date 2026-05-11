@@ -77,6 +77,9 @@ class SupportFormResponse(BaseModel):
     ticket_id: str
     message: str
     estimated_response_time: str
+    ai_response: Optional[str] = None
+    escalated: Optional[bool] = False
+    escalation_reason: Optional[str] = None
 
 
 class TicketStatusResponse(BaseModel):
@@ -203,20 +206,63 @@ async def submit_support_form(
             f"customer={customer['id']}, category={submission.category}"
         )
 
+        # Call AI directly for immediate response
+        ai_reply = None
+        escalated = False
+        escalation_reason = None
+        try:
+            from production.agent.customer_success_agent import process_customer_message
+            agent_result = await process_customer_message(
+                message=submission.message,
+                channel='web_form',
+                customer_email=submission.email,
+                customer_name=submission.name,
+                ticket_subject=submission.subject,
+            )
+            ai_reply = agent_result.output
+            escalated = agent_result.escalated
+            escalation_reason = agent_result.escalation_reason
+        except Exception as agent_err:
+            logger.warning(f"Direct AI call failed: {agent_err}")
+
         return SupportFormResponse(
             ticket_id=ticket_id,
-            message="Thank you for contacting us! Our AI assistant will respond shortly.",
-            estimated_response_time="Usually within 5 minutes"
+            message="Thank you for contacting us! Here is our response:",
+            estimated_response_time="Responded instantly",
+            ai_response=ai_reply,
+            escalated=escalated,
+            escalation_reason=escalation_reason,
         )
 
     except ImportError as e:
         # Fallback when database/Kafka not available (development mode)
         logger.warning(f"Database/Kafka not available, using mock mode: {e}")
 
+        ai_reply = None
+        escalated = False
+        escalation_reason = None
+        try:
+            from production.agent.customer_success_agent import process_customer_message
+            agent_result = await process_customer_message(
+                message=submission.message,
+                channel='web_form',
+                customer_email=submission.email,
+                customer_name=submission.name,
+                ticket_subject=submission.subject,
+            )
+            ai_reply = agent_result.output
+            escalated = agent_result.escalated
+            escalation_reason = agent_result.escalation_reason
+        except Exception as agent_err:
+            logger.warning(f"Direct AI call failed: {agent_err}")
+
         return SupportFormResponse(
             ticket_id=ticket_id,
-            message="Thank you for contacting us! Our AI assistant will respond shortly.",
-            estimated_response_time="Usually within 5 minutes"
+            message="Thank you for contacting us! Here is our response:",
+            estimated_response_time="Responded instantly",
+            ai_response=ai_reply,
+            escalated=escalated,
+            escalation_reason=escalation_reason,
         )
 
 

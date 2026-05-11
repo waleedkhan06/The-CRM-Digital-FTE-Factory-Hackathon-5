@@ -171,6 +171,43 @@ customer_success_agent = create_customer_success_agent()
 
 # ─── Convenience Function ──────────────────────────────────────────────────
 
+def _detect_escalation(message: str) -> tuple[bool, str | None]:
+    """Detect if a message requires escalation based on keywords.
+    
+    Returns (escalated: bool, reason: str | None)
+    """
+    msg = message.lower()
+
+    legal_keywords = ["sue", "lawyer", "attorney", "legal action", "lawsuit", "court"]
+    if any(k in msg for k in legal_keywords):
+        return True, "legal_threat"
+
+    refund_keywords = ["refund", "money back", "chargeback", "dispute charge", "reimburse"]
+    if any(k in msg for k in refund_keywords):
+        return True, "refund_request"
+
+    human_keywords = ["speak to human", "talk to human", "real person", "human agent",
+                      "speak to agent", "talk to agent", "human support", "live agent"]
+    if any(k in msg for k in human_keywords):
+        return True, "human_requested"
+
+    angry_keywords = ["worst", "garbage", "terrible", "hate", "furious", "disgusting",
+                      "outrageous", "scam", "fraud", "useless", "pathetic", "unacceptable"]
+    if any(k in msg for k in angry_keywords):
+        return True, "angry_customer"
+
+    competitor_keywords = ["asana", "monday.com", "jira", "salesforce", "hubspot",
+                           "zendesk", "freshdesk", "competitor", "compare to", "better than"]
+    if any(k in msg for k in competitor_keywords):
+        return True, "competitor_inquiry"
+
+    pricing_keywords = ["pricing", "negotiat", "discount", "enterprise plan", "custom plan"]
+    if any(k in msg for k in pricing_keywords):
+        return True, "pricing_negotiation"
+
+    return False, None
+
+
 async def process_customer_message(
     message: str,
     channel: str = "web_form",
@@ -211,6 +248,9 @@ async def process_customer_message(
         'ticket_subject': ticket_subject,
     }
 
+    # Pre-detect escalation from message keywords (works regardless of AI model)
+    escalated, escalation_reason = _detect_escalation(message)
+
     # Run agent — use SDK Runner if available, else fallback .run()
     try:
         from agents import Runner
@@ -218,7 +258,8 @@ async def process_customer_message(
         return AgentResult(
             output=sdk_result.final_output or "",
             tool_calls=[],
-            escalated=False,
+            escalated=escalated,
+            escalation_reason=escalation_reason,
             sentiment_score=0.5,
             topics=["general"],
             ticket_id="TK-2026-0001",
@@ -253,7 +294,8 @@ async def process_customer_message(
             return AgentResult(
                 output=response_text,
                 tool_calls=[],
-                escalated=False,
+                escalated=escalated,
+                escalation_reason=escalation_reason,
                 sentiment_score=0.5,
                 topics=["general"],
                 ticket_id="TK-2026-0001",
@@ -292,7 +334,8 @@ async def process_customer_message(
                 return AgentResult(
                     output=response_text,
                     tool_calls=[],
-                    escalated=False,
+                    escalated=escalated,
+                    escalation_reason=escalation_reason,
                     sentiment_score=0.5,
                     topics=["general"],
                     ticket_id="TK-2026-0001",

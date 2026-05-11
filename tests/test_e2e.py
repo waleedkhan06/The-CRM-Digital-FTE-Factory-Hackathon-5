@@ -25,7 +25,7 @@ BASE_URL = "http://localhost:8000"
 
 # ─── Fixtures ──────────────────────────────────────────────────────────────
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session")
 async def client():
     """Create an async HTTP client for testing."""
     transport = ASGITransport(app=app)

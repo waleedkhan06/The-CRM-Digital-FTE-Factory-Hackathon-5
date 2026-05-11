@@ -28,8 +28,9 @@ from fastapi.testclient import TestClient
 class TestGmailHandler:
     """Tests for GmailHandler (mock mode — no live Gmail API)."""
 
-    def test_handler_initializes_in_mock_mode(self):
+    def test_handler_initializes_in_mock_mode(self, monkeypatch):
         """Handler should gracefully start even without real credentials."""
+        monkeypatch.setenv("GMAIL_TOKEN_PATH", "/nonexistent/token.json")
         from production.channels.gmail_handler import GmailHandler
         handler = GmailHandler(credentials_path="/nonexistent/path.json")
         assert handler is not None
