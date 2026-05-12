@@ -1,0 +1,29 @@
+# LinkedIn Draft → Approval → Post Flow
+
+Update LinkedIn automation to **avoid direct posting** and use a Human-in-the-Loop workflow.
+
+## Flow
+
+Claude generates LinkedIn post → save draft in `/Pending_Approval/` → human reviews and moves file to `/Approved/` → Playwright reads approved file → opens LinkedIn feed → publishes post → move file to `/Done/` and log action.
+
+## Requirements
+
+* Claude only **creates drafts**, never posts directly.
+* Draft format:
+
+```
+/Pending_Approval/LINKEDIN_POST_<timestamp>.md
+---
+type: linkedin_post
+status: pending
+---
+
+## Post Content
+<generated text>
+```
+
+* Posting happens **only when file appears in `/Approved/`**.
+* Use Playwright to open `https://www.linkedin.com/feed/`, insert the content, and click **Post** using stable selectors.
+* After successful posting, move the file to `/Done/` and record the event in `/Logs/`.
+
+Goal: safe LinkedIn automation using **Draft → Approval → Post** workflow while keeping the rest of the Silver-tier system unchanged.
