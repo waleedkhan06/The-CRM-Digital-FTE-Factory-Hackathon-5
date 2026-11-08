@@ -1,0 +1,106 @@
+# ==============================================================================
+# Security & Credentials
+# ==============================================================================
+.env
+.env.*
+.env.backup
+!.env.example
+credentials_backup/
+credentials/
+*.json.token
+*token*.json
+client_secret*.json
+*client_secret*.json
+*.pem
+*.key
+*.cert
+*.crt
+k8s/secrets.yaml
+!k8s/secrets.example.yaml
+
+# ==============================================================================
+# Python & Bytecode
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ==============================================================================
+# Testing, Coverage & QA
+# ==============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# ==============================================================================
+# Node.js & Web Form Frontend
+# ==============================================================================
+node_modules/
+web-form/.next/
+web-form/out/
+web-form/build/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ==============================================================================
+# Hackathon & Local Logs / Artifacts
+# ==============================================================================
+*.log
+logs/
+hacktahon-o/ai-box-silver/.env*
+hacktahon-o/ai-box-silver/.obsidian/
+hacktahon-o/ai-box-silver/logs/
+hacktahon-o/ai-box-silver/drafts/
+
+# ==============================================================================
+# OS & Editor Artifacts
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace

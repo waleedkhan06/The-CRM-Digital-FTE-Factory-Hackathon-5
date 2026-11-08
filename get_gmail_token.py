@@ -18,12 +18,25 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
+import glob
+
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/gmail.send',
 ]
 
-CLIENT_SECRET_FILE = "client_secret_677937694195-ka1jn3971g0ps4oc7ohjmtda1uh89io7.apps.googleusercontent.com.json"
+def find_client_secret_file():
+    env_path = os.getenv("GMAIL_CLIENT_SECRET_FILE")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    if os.path.exists("credentials/client_secret.json"):
+        return "credentials/client_secret.json"
+    matches = glob.glob("client_secret*.json")
+    if matches:
+        return matches[0]
+    return "client_secret.json"
+
+CLIENT_SECRET_FILE = find_client_secret_file()
 TOKEN_PATH = "credentials/gmail_token.json"
 REDIRECT_URI = "http://localhost:8080/"
 
