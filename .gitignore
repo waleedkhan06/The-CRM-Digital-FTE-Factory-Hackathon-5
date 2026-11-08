@@ -84,10 +84,6 @@ yarn-error.log*
 # ==============================================================================
 *.log
 logs/
-hacktahon-o/ai-box-silver/.env*
-hacktahon-o/ai-box-silver/.obsidian/
-hacktahon-o/ai-box-silver/logs/
-hacktahon-o/ai-box-silver/drafts/
 
 # ==============================================================================
 # OS & Editor Artifacts
